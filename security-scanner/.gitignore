@@ -1,0 +1,64 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.pyc
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Scanner output directories
+nuclei-output/
+jaeles-output/
+results/
+reports/
+zap-results/
+nikto-results/
+nmap-results/
+masscan-results/
+
+# Scanner output files
+*.json
+!package.json
+!package-lock.json
+!tsconfig.json
+test_output.json
+test_unified_report.json
+targets.txt
+*_report.json
+scan_*.json
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Docker
+.dockerignore
+
+# Documentation
+*.md
+!README.md
