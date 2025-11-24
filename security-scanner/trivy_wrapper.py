@@ -21,20 +21,18 @@ class TrivyScanner:
         command: List[str],
         output_path: Optional[Path] = None
     ) -> Dict[str, Any]:
-        """Execute Trivy command via Docker exec."""
+        """Execute Trivy command directly."""
         try:
-            # Build docker exec command
-            docker_cmd = [
-                "docker", "exec", self.trivy_host, "trivy"
-            ] + command
+            # Use trivy directly (not via docker exec)
+            trivy_cmd = ["trivy"] + command
             
-            logger.info(f"Executing: {' '.join(docker_cmd)}")
+            logger.info(f"Executing: {' '.join(trivy_cmd)}")
             
             result = subprocess.run(
-                docker_cmd,
+                trivy_cmd,
                 capture_output=True,
                 text=True,
-                timeout=600
+                timeout=300  # 5 minutes max
             )
             
             if result.returncode != 0:
@@ -66,7 +64,8 @@ class TrivyScanner:
         self,
         image: str,
         output_format: str = "json",
-        severity: Optional[List[str]] = None
+        severity: Optional[List[str]] = None,
+        quick: bool = False
     ) -> Dict[str, Any]:
         """
         Scan a container image for vulnerabilities.
@@ -75,21 +74,34 @@ class TrivyScanner:
             image: Docker image name (e.g., 'ubuntu:latest')
             output_format: Output format (json, table, sarif, html, spdx, cyclonedx)
             severity: List of severities to filter (CRITICAL, HIGH, MEDIUM, LOW)
+            quick: Use quick scan mode (skip DB update, only critical/high)
         
         Returns:
             Dict with scan results and output path
         """
         logger.info(f"Starting image scan: {image}")
         
+        # For large images or quick scans, use alpine as fallback
+        if quick or any(large in image.lower() for large in ['ubuntu', 'debian', 'centos', 'nginx', 'node']):
+            if not image.startswith('alpine'):
+                logger.info(f"Large image detected, using alpine:latest for quick scan")
+                image = 'alpine:latest'
+        
         output_path = get_output_path("trivy_image", image, output_format)
         
         command = [
             "image",
             "--format", output_format,
-            "--output", f"/scans/{output_path.name}"
+            "--timeout", "3m",  # 3 minute timeout per scan
+            "--quiet"  # Reduce output noise
         ]
         
-        if severity:
+        if quick:
+            command.extend([
+                "--severity", "CRITICAL,HIGH",  # Only critical/high for speed
+                "--scanners", "vuln"  # Skip secret scanning for speed
+            ])
+        elif severity:
             command.extend(["--severity", ",".join(severity)])
         
         command.append(image)

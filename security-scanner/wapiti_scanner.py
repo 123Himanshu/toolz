@@ -49,44 +49,35 @@ class WapitiScanner:
         self.docker_image = docker_image
         self.wapiti_cmd = "wapiti"
     
-    def scan(self, target: str, module: str, parallel: bool = False, workers: int = 5) -> Dict[str, Any]:
+    def scan(self, target: str, module: str = "xss,sql,file") -> Dict[str, Any]:
         """
-        Execute a Wapiti scan
+        Execute a Wapiti QUICK vulnerability check
+        
+        PURPOSE: Web vulnerability scanning
+        USE WHEN: Need XSS/SQLi/LFI checks
+        AVOID: Large-scale scanning
         
         Args:
             target: Target URL
-            module: Module name (sql, xss, etc.) or 'all'
-            parallel: Use parallel scanning for all modules
-            workers: Number of parallel workers
-            
+            module: Quick check modules (default: xss,sql,file)
+        
         Returns:
             Scan results dictionary
         """
-        if module == "all":
-            if parallel:
-                return self._scan_all_parallel(target, workers)
-            else:
-                return self._scan_all_sequential(target)
-        else:
-            return self._scan_single(target, module)
+        # Quick scan with limited modules
+        return self._scan_quick(target, module)
     
-    def _scan_single(self, target: str, module: str) -> Dict[str, Any]:
-        """Scan with a single module"""
-        if module not in MODULES:
-            return {"success": False, "error": f"Invalid module: {module}"}
+    def _scan_quick(self, target: str, modules: str) -> Dict[str, Any]:
+        """Quick scan with limited modules"""
+        sys.stderr.write(f"[*] Starting Wapiti scan on {target}\n")
+        sys.stderr.write(f"[*] Modules: {modules}\n")
         
-        print(f"[*] Starting {MODULES[module]} scan on {target}")
-        
-        # Create results directory if it doesn't exist
         RESULTS_DIR.mkdir(parents=True, exist_ok=True)
         
-        output_file = str(RESULTS_DIR / f"{module}_scan.json")
+        output_file = str(RESULTS_DIR / f"wapiti_quick_scan.json")
         
         if self.use_docker:
-            # Use Docker with proper path handling
             results_path = str(RESULTS_DIR.absolute()).replace('\\', '/')
-            
-            # Convert Windows path to Docker format if needed
             if ':' in results_path:
                 drive = results_path[0].lower()
                 results_path = f'/{drive}{results_path[2:]}'
@@ -96,16 +87,20 @@ class WapitiScanner:
                 "-v", f"{results_path}:/results",
                 self.docker_image,
                 "-u", target,
-                "-m", module,
+                "-m", modules,  # Multiple modules
+                "--scope", "url",  # Quick scope
+                "--max-depth", "2",  # Shallow crawl
+                "--max-links-per-page", "20",  # Limited links
                 "-f", "json",
-                "-o", f"/results/{module}_scan.json"
+                "-o", f"/results/wapiti_quick_scan.json"
             ]
         else:
-            # Use local binary
             cmd = [
                 self.wapiti_cmd,
                 "-u", target,
-                "-m", module,
+                "-m", modules,
+                "--scope", "url",
+                "-d", "2",  # depth
                 "-f", "json",
                 "-o", output_file
             ]
@@ -115,15 +110,19 @@ class WapitiScanner:
                 cmd,
                 capture_output=True,
                 text=True,
-                timeout=600
+                timeout=300  # 5 min max for quick scan
             )
             
             scan_result = {
                 "success": result.returncode == 0,
+                "tool": "wapiti",
+                "role": "speed",
+                "purpose": "Web vulnerability scanning",
                 "target": target,
-                "module": module,
+                "modules": modules,
                 "output_file": output_file,
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
+                "note": "Quick web vulnerability checks"
             }
             
             if Path(output_file).exists():
@@ -134,179 +133,18 @@ class WapitiScanner:
                     scan_result["findings"] = None
             
             if scan_result["success"]:
-                print(f"[+] Scan completed successfully")
+                sys.stderr.write(f"[+] Scan completed successfully\n")
             else:
-                print(f"[-] Scan failed")
+                sys.stderr.write(f"[-] Scan failed\n")
             
             return scan_result
             
         except subprocess.TimeoutExpired:
-            return {"success": False, "error": "Scan timeout (600s)", "target": target, "module": module}
+            return {"success": False, "error": "Quick scan timeout (300s)", "target": target, "modules": modules}
         except Exception as e:
-            return {"success": False, "error": str(e), "target": target, "module": module}
+            return {"success": False, "error": str(e), "target": target, "modules": modules}
     
-    def _scan_all_sequential(self, target: str) -> Dict[str, Any]:
-        """Scan with all modules sequentially"""
-        print(f"[*] Starting comprehensive scan on {target}")
-        print(f"[*] Running {len(MODULES)} modules sequentially")
-        
-        results = {}
-        for i, module in enumerate(MODULES.keys(), 1):
-            print(f"\n[*] Module {i}/{len(MODULES)}: {MODULES[module]}")
-            results[module] = self._scan_single(target, module)
-        
-        self._save_comprehensive_report(results, target)
-        return results
-    
-    def _scan_all_parallel(self, target: str, workers: int) -> Dict[str, Any]:
-        """Scan with all modules in parallel"""
-        print(f"[*] Starting parallel scan on {target}")
-        print(f"[*] Running {len(MODULES)} modules with {workers} workers")
-        
-        results = {}
-        with ThreadPoolExecutor(max_workers=workers) as executor:
-            future_to_module = {
-                executor.submit(self._scan_single, target, module): module
-                for module in MODULES.keys()
-            }
-            
-            completed = 0
-            for future in as_completed(future_to_module):
-                module = future_to_module[future]
-                completed += 1
-                try:
-                    results[module] = future.result()
-                    print(f"[+] Completed {module} ({completed}/{len(MODULES)})")
-                except Exception as e:
-                    results[module] = {"success": False, "error": str(e)}
-                    print(f"[-] Failed {module}: {e}")
-        
-        self._save_comprehensive_report(results, target)
-        return results
-    
-    def batch_scan(self, targets: List[str], module: str, workers: int = 5) -> Dict[str, Any]:
-        """Scan multiple targets with one module in parallel"""
-        print(f"[*] Batch scanning {len(targets)} targets with {module} module")
-        print(f"[*] Using {workers} workers")
-        
-        results = {}
-        with ThreadPoolExecutor(max_workers=workers) as executor:
-            future_to_target = {
-                executor.submit(self._scan_single, target, module): target
-                for target in targets
-            }
-            
-            for future in as_completed(future_to_target):
-                target = future_to_target[future]
-                try:
-                    results[target] = future.result()
-                    print(f"[+] Completed {target}")
-                except Exception as e:
-                    results[target] = {"success": False, "error": str(e)}
-                    print(f"[-] Failed {target}: {e}")
-        
-        return results
-    
-    def generate_html_report(self, results: Dict[str, Any], output_file: str = None) -> str:
-        """Generate HTML report from scan results"""
-        if output_file is None:
-            output_file = str(REPORTS_DIR / f"report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html")
-        
-        # Calculate statistics
-        total_scans = len(results)
-        successful = sum(1 for r in results.values() if r.get("success"))
-        
-        html = f"""<!DOCTYPE html>
-<html>
-<head>
-    <title>Wapiti Scan Report</title>
-    <style>
-        body {{ font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }}
-        .container {{ max-width: 1200px; margin: 0 auto; background: white; padding: 30px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }}
-        h1 {{ color: #333; border-bottom: 3px solid #007bff; padding-bottom: 10px; }}
-        .stats {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin: 20px 0; }}
-        .stat-card {{ background: #f8f9fa; padding: 20px; border-radius: 5px; text-align: center; }}
-        .stat-value {{ font-size: 32px; font-weight: bold; color: #007bff; }}
-        .stat-label {{ color: #666; margin-top: 5px; }}
-        table {{ width: 100%; border-collapse: collapse; margin: 20px 0; }}
-        th, td {{ padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }}
-        th {{ background: #007bff; color: white; }}
-        tr:hover {{ background: #f5f5f5; }}
-        .success {{ color: #28a745; }}
-        .failed {{ color: #dc3545; }}
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>🔒 Wapiti Security Scan Report</h1>
-        <p><strong>Generated:</strong> {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
-        
-        <div class="stats">
-            <div class="stat-card">
-                <div class="stat-value">{total_scans}</div>
-                <div class="stat-label">Total Scans</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value">{successful}</div>
-                <div class="stat-label">Successful</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value">{total_scans - successful}</div>
-                <div class="stat-label">Failed</div>
-            </div>
-        </div>
-        
-        <h2>Scan Results</h2>
-        <table>
-            <tr>
-                <th>Module</th>
-                <th>Status</th>
-                <th>Target</th>
-                <th>Timestamp</th>
-            </tr>
-"""
-        
-        for module, result in results.items():
-            status = "✓ Success" if result.get("success") else "✗ Failed"
-            status_class = "success" if result.get("success") else "failed"
-            target = result.get("target", "N/A")
-            timestamp = result.get("timestamp", "N/A")
-            
-            html += f"""
-            <tr>
-                <td>{MODULES.get(module, module)}</td>
-                <td class="{status_class}">{status}</td>
-                <td>{target}</td>
-                <td>{timestamp}</td>
-            </tr>
-"""
-        
-        html += """
-        </table>
-    </div>
-</body>
-</html>
-"""
-        
-        with open(output_file, 'w') as f:
-            f.write(html)
-        
-        print(f"[+] HTML report saved to {output_file}")
-        return output_file
-    
-    def _save_comprehensive_report(self, results: Dict[str, Any], target: str):
-        """Save comprehensive scan results"""
-        output = {
-            "timestamp": datetime.now().isoformat(),
-            "target": target,
-            "results": results
-        }
-        
-        output_file = REPORTS_DIR / f"comprehensive_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-        with open(output_file, 'w') as f:
-            json.dump(output, f, indent=2)
-        
-        print(f"\n[+] Comprehensive results saved to {output_file}")
+    # Quick scan method only
 
 
 def list_modules():

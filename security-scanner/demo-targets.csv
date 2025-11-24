@@ -1,0 +1,24 @@
+# Demo targets for CSV upload feature
+# Mix of IPs, CIDR ranges, domains, and URLs
+
+# IP Addresses
+192.168.1.10
+10.0.0.5
+172.16.0.100
+
+# CIDR Ranges
+10.0.0.0/24
+192.168.1.0/24
+172.16.0.0/16
+
+# Domains
+example.com
+test.org
+demo.net
+api.example.com
+
+# URLs
+https://admin.example.com
+https://login.test.org/admin
+http://api.demo.net/v1
+https://dashboard.example.com/login

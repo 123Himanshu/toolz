@@ -1,0 +1,63 @@
+version: '3'
+
+services:
+  # Main security scanner with all tools
+  security-scanner:
+    image: security-scanner:latest
+    container_name: security-scanner
+    networks:
+      - scanner-network
+    volumes:
+      - ./results:/scanner/results
+    depends_on:
+      - openvas
+
+  # OpenVAS/GVM - Greenbone Vulnerability Manager
+  openvas:
+    image: greenbone/openvas-scanner:latest
+    container_name: openvas-scanner
+    ports:
+      - "9392:9392"  # GVM API
+      - "9390:9390"  # GSA Web Interface
+    environment:
+      - USERNAME=admin
+      - PASSWORD=admin
+      - RELAYHOST=smtp.gmail.com
+      - SMTPPORT=587
+    volumes:
+      - openvas-data:/var/lib/openvas
+      - openvas-logs:/var/log/gvm
+    networks:
+      - scanner-network
+    restart: unless-stopped
+
+  # PostgreSQL for OpenVAS
+  openvas-postgres:
+    image: postgres:13
+    container_name: openvas-postgres
+    environment:
+      - POSTGRES_DB=gvmd
+      - POSTGRES_USER=gvmd
+      - POSTGRES_PASSWORD=gvmd
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - scanner-network
+    restart: unless-stopped
+
+  # Redis for OpenVAS
+  openvas-redis:
+    image: redis:6
+    container_name: openvas-redis
+    networks:
+      - scanner-network
+    restart: unless-stopped
+
+networks:
+  scanner-network:
+    driver: bridge
+
+volumes:
+  openvas-data:
+  openvas-logs:
+  postgres-data:

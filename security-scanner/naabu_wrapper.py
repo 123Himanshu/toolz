@@ -21,24 +21,24 @@ class NaabuWrapper:
         # Common web ports (default focus)
         self.web_ports = "80,81,443,8000,8008,8080,8443,8888,9000,9090"
     
-    def scan_domain(self, domain: str, ports: str = None, top_ports: int = None,
-                    exclude_ports: str = None, rate: int = 1000, 
-                    timeout: int = 10, retries: int = 1) -> Dict[str, Any]:
+    def scan_domain(self, domain: str) -> Dict[str, Any]:
         """
-        Scan domain for open ports - Web-focused
+        Scan domain for open web ports - CLEAN JSON OUTPUT ONLY
+        
+        PURPOSE: API-friendly JSON output for automation
+        USE WHEN: Need clean JSON for backend processing
+        AVOID: Detailed scanning (use Nmap instead)
         
         Args:
             domain: Domain name (e.g., "example.com", "sub.example.com")
-            ports: Specific ports (e.g., "80,443,8080") - defaults to web ports
-            top_ports: Scan top N ports (e.g., 100, 1000)
-            exclude_ports: Ports to exclude
-            rate: Packets per second (default: 1000)
-            timeout: Timeout in seconds (default: 10)
-            retries: Number of retries (default: 1)
         
         Returns:
-            Dict with domain, open ports, and source
+            Dict with clean JSON port data
         """
+        # FIXED SETTINGS for API-friendly output
+        rate = 1000
+        timeout = 10
+        retries = 1
         
         # Validate domain
         if not self._is_valid_domain(domain):
@@ -59,17 +59,8 @@ class NaabuWrapper:
             '-retries', str(retries)
         ]
         
-        # Port selection (prioritize web ports if nothing specified)
-        if ports:
-            cmd.extend(['-p', ports])
-        elif top_ports:
-            cmd.extend(['-top-ports', str(top_ports)])
-        else:
-            # Default: web ports only
-            cmd.extend(['-p', self.web_ports])
-        
-        if exclude_ports:
-            cmd.extend(['-exclude-ports', exclude_ports])
+        # FIXED: Web ports only (Naabu's unique use case)
+        cmd.extend(['-p', self.web_ports])
         
         try:
             # Run naabu
@@ -94,12 +85,13 @@ class NaabuWrapper:
             return {
                 'success': True,
                 'tool': 'naabu',
+                'role': 'speed',
+                'purpose': 'Clean JSON output for API/automation',
                 'domain': domain,
-                'ports_scanned': ports or top_ports or 'web-ports',
-                'open_ports': open_ports,
+                'ports_scanned': 'web-ports',
+                'open_ports': open_ports,  # Clean JSON format
                 'total_ports': len(open_ports),
-                'rate': rate,
-                'source': 'naabu',
+                'api_friendly': True,  # Indicates clean JSON
                 'command': ' '.join(cmd)
             }
             
@@ -118,29 +110,22 @@ class NaabuWrapper:
                 'domain': domain
             }
     
-    def scan_subdomains(self, domains: List[str], ports: str = None,
-                       rate: int = 1000) -> Dict[str, Any]:
+    def scan_subdomains(self, domains: List[str]) -> Dict[str, Any]:
         """
-        Scan multiple subdomains for open ports
-        Perfect for subdomain enumeration workflows
+        Scan multiple subdomains - CLEAN JSON OUTPUT
+        
+        PURPOSE: Batch subdomain scanning with API-friendly output
         
         Args:
             domains: List of domain/subdomain names
-            ports: Ports to scan (defaults to web ports)
-            rate: Scan rate
         
         Returns:
-            Dict with results for all domains
+            Dict with clean JSON results for all domains
         """
-        
         results = []
         
         for domain in domains:
-            result = self.scan_domain(
-                domain=domain,
-                ports=ports,
-                rate=rate
-            )
+            result = self.scan_domain(domain)
             results.append(result)
         
         # Aggregate results

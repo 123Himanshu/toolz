@@ -42,34 +42,25 @@ class NiktoScanner:
         
         logger.info(f"✅ Nikto Scanner initialized (Docker: {use_docker})")
     
-    def scan(self, target: str, port: int = 80, ssl: bool = False, 
-             tuning: str = "x", timeout: int = 3600) -> Dict[str, Any]:
+    def scan(self, target: str, port: int = 80, ssl: bool = False) -> Dict[str, Any]:
         """
-        Nikto Scan - Comprehensive web server scan
+        Nikto Scan - LEGACY SERVER MISCONFIGURATION CHECKS ONLY
+        
+        PURPOSE: Detect old Apache/IIS/Nginx misconfigurations
+        USE WHEN: Target appears to be legacy server (Apache 2.2, IIS 6, etc.)
+        AVOID: Modern web apps (use Nuclei/ZAP instead)
         
         Args:
             target: Target URL or hostname
             port: Target port (default: 80)
             ssl: Use SSL/HTTPS (default: False)
-            tuning: Scan tuning (default: 'x' for all tests)
-                   1: Interesting files
-                   2: Misconfiguration
-                   3: Information disclosure
-                   4: Injection (XSS/Script/HTML)
-                   5: Remote file retrieval
-                   6: Denial of service
-                   7: Remote file retrieval (inside web root)
-                   8: Command execution
-                   9: SQL injection
-                   a: Authentication bypass
-                   b: Software identification
-                   c: Remote source inclusion
-                   x: All tests
-            timeout: Scan timeout in seconds
             
         Returns:
             Scan results dictionary
         """
+        # FIXED: Only misconfiguration checks (tuning 2)
+        tuning = "2"  # Misconfiguration ONLY
+        timeout = 600  # 10 min max
         logger.info(f"🔍 Starting Nikto Scan: {target}:{port}")
         
         # Clean target
@@ -135,6 +126,9 @@ class NiktoScanner:
             
             scan_result = {
                 'scan_id': scan_id,
+                'tool': 'nikto',
+                'role': 'specialized',
+                'purpose': 'Legacy server misconfiguration detection',
                 'target': target,
                 'port': port,
                 'ssl': ssl,
@@ -146,6 +140,7 @@ class NiktoScanner:
                 'findings_count': len(findings),
                 'findings': findings,
                 'output_file': str(output_file),
+                'note': 'Use Nuclei/ZAP for modern vulnerability scanning',
                 'stdout': result.stdout,
                 'stderr': result.stderr,
                 'exit_code': result.returncode
@@ -175,50 +170,9 @@ class NiktoScanner:
                 'error': str(e)
             }
     
-    def quick_scan(self, target: str) -> Dict[str, Any]:
-        """
-        Quick Nikto scan - Essential tests only
-        
-        Args:
-            target: Target URL
-            
-        Returns:
-            Scan results
-        """
-        return self.scan(target, tuning="1234", timeout=600)
-    
-    def full_scan(self, target: str) -> Dict[str, Any]:
-        """
-        Full Nikto scan - All tests
-        
-        Args:
-            target: Target URL
-            
-        Returns:
-            Scan results
-        """
-        return self.scan(target, tuning="x", timeout=3600)
-    
-    def scan_multiple(self, targets: List[str], **kwargs) -> List[Dict]:
-        """
-        Scan multiple targets
-        
-        Args:
-            targets: List of target URLs
-            **kwargs: Additional arguments for scan()
-            
-        Returns:
-            List of scan results
-        """
-        logger.info(f"🔍 Scanning {len(targets)} targets with Nikto")
-        results = []
-        
-        for i, target in enumerate(targets, 1):
-            logger.info(f"[{i}/{len(targets)}] Scanning {target}")
-            result = self.scan(target, **kwargs)
-            results.append(result)
-        
-        return results
+    # REMOVED: All custom scan methods
+    # REASON: Nikto is for legacy server misconfigs ONLY
+    # Use Nuclei/ZAP for modern vulnerability scanning
     
     def _parse_results(self, output_file: Path) -> List[Dict]:
         """Parse Nikto text output"""

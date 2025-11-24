@@ -51,35 +51,33 @@ class RustScanWrapper:
             logger.error(f"RustScan availability check failed: {e}")
             return False
     
-    def scan(self, target: str, ports: Optional[str] = None, 
-             batch_size: int = 5000, timeout: int = 3000,
-             ulimit: int = 5000, aggressive: bool = False) -> Dict:
+    def scan(self, target: str) -> Dict:
         """
-        Run RustScan port discovery
+        Run RustScan FAST port discovery ONLY
+        
+        PURPOSE: Ultra-fast port discovery (3 sec for 65535 ports)
+        FEEDS TO: Nmap for service detection
         
         Args:
             target: Target IP or hostname
-            ports: Port range (e.g., "1-1000" or "80,443")
-            batch_size: Batch size for port scanning
-            timeout: Timeout in milliseconds
-            ulimit: File descriptor limit
-            aggressive: Use aggressive mode (higher timeout)
             
         Returns:
-            Dict with scan results
+            Dict with discovered ports ONLY (no service detection)
         """
+        # FIXED SETTINGS for speed optimization
+        batch_size = 10000  # Maximum speed
+        timeout = 1500      # Fast timeout
+        ulimit = 5000       # Standard limit
         try:
-            # Build RustScan command
-            cmd = ["rustscan", "-a", target, "-g"]
-            
-            if ports:
-                cmd.extend(["-p", ports])
-            
-            cmd.extend([
+            # Build RustScan command - SPEED OPTIMIZED ONLY
+            cmd = [
+                "rustscan",
+                "-a", target,
+                "-g",  # Greppable output
                 "--batch-size", str(batch_size),
-                "--timeout", str(timeout if not aggressive else 10000),
+                "--timeout", str(timeout),
                 "--ulimit", str(ulimit)
-            ])
+            ]
             
             # Execute in Docker or locally
             if self.docker_mode:
@@ -91,7 +89,7 @@ class RustScanWrapper:
                 cmd,
                 capture_output=True,
                 text=True,
-                timeout=90 if not aggressive else 180
+                timeout=90  # Fixed timeout for speed
             )
             
             # Parse output
@@ -99,7 +97,12 @@ class RustScanWrapper:
             
             return {
                 "success": len(open_ports) > 0,
-                "ports": open_ports,
+                "tool": "rustscan",
+                "role": "speed",
+                "purpose": "Fast port discovery for Nmap",
+                "ports": open_ports,  # ONLY ports, no service info
+                "port_count": len(open_ports),
+                "feed_to_nmap": True,  # Indicates this feeds to Nmap
                 "raw_output": result.stdout,
                 "error": result.stderr if result.returncode != 0 else None,
                 "command": " ".join(cmd)
@@ -155,39 +158,6 @@ class RustScanWrapper:
         
         return ports
     
-    def quick_scan(self, target: str) -> Dict:
-        """
-        Quick scan with default settings
-        
-        Args:
-            target: Target IP or hostname
-            
-        Returns:
-            Dict with scan results
-        """
-        return self.scan(target, batch_size=5000, timeout=3000)
-    
-    def aggressive_scan(self, target: str) -> Dict:
-        """
-        Aggressive scan with higher timeouts
-        
-        Args:
-            target: Target IP or hostname
-            
-        Returns:
-            Dict with scan results
-        """
-        return self.scan(target, batch_size=10000, timeout=10000, aggressive=True)
-    
-    def custom_ports_scan(self, target: str, ports: str) -> Dict:
-        """
-        Scan specific ports
-        
-        Args:
-            target: Target IP or hostname
-            ports: Port range or list (e.g., "1-1000" or "80,443,8080")
-            
-        Returns:
-            Dict with scan results
-        """
-        return self.scan(target, ports=ports)
+    # REMOVED: All custom scan methods
+    # REASON: RustScan has ONE job - fast port discovery
+    # Use Nmap for everything else

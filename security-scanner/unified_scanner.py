@@ -1,6 +1,6 @@
 """
-Unified Security Scanner - All 5 Scanners
-Nuclei + Jaeles + Wapiti + ZAP + Nikto
+Unified Security Scanner - All 4 Scanners
+Nuclei + Jaeles + Wapiti + Nikto
 Complete security testing suite
 """
 

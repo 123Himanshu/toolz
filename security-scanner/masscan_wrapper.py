@@ -1,10 +1,11 @@
 """
 Masscan Wrapper - High-Speed IP Range Scanner
-ONLY for large-scale port discovery on IP ranges /
+ONLY for large-scale port discovery on IP ranges
 """
 import subprocess
 import json
 import re
+import sys
 from typing import Dict, List, Any
 
 class MasscanWrapper:
@@ -13,37 +14,50 @@ class MasscanWrapper:
     def __init__(self):
         self.tool_name = "masscan"
     
-    def scan(self, ip_range: str, ports: str = "1-1000", rate: int = 10000, 
-             max_rate: int = None, exclude_ports: str = None) -> Dict[str, Any]:
+    def scan(self, ip_range: str, ports: str = "80,443,22,21,25,3389,8080,8443") -> Dict[str, Any]:
         """
-        Masscan IP range scan - ONLY for port discovery
+        Masscan LARGE IP RANGE scan ONLY
+        
+        PURPOSE: Internet-scale port discovery (10M packets/sec)
+        USE WHEN: Scanning /16, /24 networks or 1000+ IPs
+        AVOID: Single targets (use RustScan instead)
         
         Args:
-            ip_range: IP range (e.g., "192.168.1.0/24", "10.0.0.0/16")
-            ports: Port range (e.g., "80,443", "1-1000", "1-65535")
-            rate: Packets per second (default: 10000)
-            max_rate: Maximum rate limit (optional)
-            exclude_ports: Ports to exclude (optional)
+            ip_range: IP range in CIDR (e.g., "192.168.1.0/24", "10.0.0.0/16")
+            ports: Common ports only (default: web + SSH + RDP)
         
         Returns:
-            Dict with discovered IPs and their open ports
+            Dict with discovered IPs and their open ports ONLY
         """
+        # AUTO-CONVERT: Single IP to /32 CIDR
+        if '/' not in ip_range:
+            # Check if it's a valid IP
+            import re
+            if re.match(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$', ip_range):
+                ip_range = f"{ip_range}/32"  # Single host
+                print(f"[*] Auto-converted to CIDR: {ip_range}", file=sys.stderr)
+            else:
+                return {
+                    'success': False,
+                    'error': 'Masscan requires IP address or CIDR notation. Use RustScan for domains.',
+                    'tool': 'masscan',
+                    'role': 'scale'
+                }
         
-        # Build masscan command
+        # AUTO-CALCULATE rate based on range size
+        cidr_size = int(ip_range.split('/')[-1])
+        rate = self.get_recommended_rate(cidr_size)
+        
+        # Build masscan command - SCALE OPTIMIZED
         cmd = [
             'masscan',
             ip_range,
             '-p', ports,
             '--rate', str(rate),
             '-oJ', '-',  # Output JSON to stdout
-            '--open-only'  # Only show open ports
+            '--open-only',  # Only show open ports
+            '--banners'  # Minimal banner grab for identification
         ]
-        
-        if max_rate:
-            cmd.extend(['--max-rate', str(max_rate)])
-        
-        if exclude_ports:
-            cmd.extend(['--exclude-ports', exclude_ports])
         
         try:
             # Run masscan
@@ -67,12 +81,16 @@ class MasscanWrapper:
             return {
                 'success': True,
                 'tool': 'masscan',
+                'role': 'scale',
+                'purpose': 'Large-scale IP range discovery',
                 'ip_range': ip_range,
+                'cidr_size': cidr_size,
                 'ports_scanned': ports,
                 'rate': rate,
                 'discovered': discovered,
                 'total_ips': len(discovered),
                 'total_ports': sum(len(d['open_ports']) for d in discovered),
+                'feed_to_nmap': True,  # Feed discovered IPs to Nmap
                 'command': ' '.join(cmd)
             }
             

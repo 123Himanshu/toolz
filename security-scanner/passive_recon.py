@@ -6,6 +6,7 @@ Gathers intelligence without directly interacting with target
 
 import subprocess
 import json
+import sys
 import dns.resolver
 import requests
 import socket
@@ -34,7 +35,7 @@ class PassiveRecon:
     def run_full_scan(self) -> Dict[str, Any]:
         """Execute all passive reconnaissance techniques"""
         try:
-            print(f"[*] Starting passive scan for: {self.target}")
+            sys.stderr.write(f"[*] Starting passive scan for: {self.target}\n")
             
             # 1. Subdomain Enumeration
             self.results["subdomains"] = self.enumerate_subdomains()
@@ -55,10 +56,10 @@ class PassiveRecon:
             self.results["leaks"] = self.detect_leaks()
             
             self.results["status"] = "completed"
-            print(f"[+] Passive scan completed for: {self.target}")
+            sys.stderr.write(f"[+] Passive scan completed for: {self.target}\n")
             
         except Exception as e:
-            print(f"[!] Error during passive scan: {str(e)}")
+            sys.stderr.write(f"[!] Error during passive scan: {str(e)}\n")
             self.results["status"] = "failed"
             self.results["error"] = str(e)
         
@@ -70,22 +71,22 @@ class PassiveRecon:
         
         try:
             # Method 1: crt.sh (Certificate Transparency Logs)
-            print("[*] Checking Certificate Transparency logs...")
+            sys.stderr.write("[*] Checking Certificate Transparency logs...\n")
             crt_subdomains = self._crtsh_search()
             subdomains.update(crt_subdomains)
             
             # Method 2: DNS Dumpster API alternative - using common subdomains
-            print("[*] Checking common subdomains...")
+            sys.stderr.write("[*] Checking common subdomains...\n")
             common_subdomains = self._check_common_subdomains()
             subdomains.update(common_subdomains)
             
             # Method 3: Subfinder (if available)
-            print("[*] Attempting subfinder...")
+            sys.stderr.write("[*] Attempting subfinder...\n")
             subfinder_results = self._run_subfinder()
             subdomains.update(subfinder_results)
             
         except Exception as e:
-            print(f"[!] Subdomain enumeration error: {str(e)}")
+            sys.stderr.write(f"[!] Subdomain enumeration error: {str(e)}\n")
         
         return sorted(list(subdomains))
     
@@ -106,7 +107,7 @@ class PassiveRecon:
                         if domain.endswith(self.target) and '*' not in domain:
                             subdomains.append(domain)
         except Exception as e:
-            print(f"[!] crt.sh error: {str(e)}")
+            sys.stderr.write(f"[!] crt.sh error: {str(e)}\n")
         
         return list(set(subdomains))
     
@@ -125,7 +126,7 @@ class PassiveRecon:
             try:
                 socket.gethostbyname(subdomain)
                 found.append(subdomain)
-                print(f"  [+] Found: {subdomain}")
+                sys.stderr.write(f"  [+] Found: {subdomain}\n")
             except socket.gaierror:
                 pass
         
@@ -143,7 +144,7 @@ class PassiveRecon:
             if result.returncode == 0:
                 return [line.strip() for line in result.stdout.split('\n') if line.strip()]
         except (subprocess.TimeoutExpired, FileNotFoundError):
-            print("[!] Subfinder not available or timed out")
+            sys.stderr.write("[!] Subfinder not available or timed out\n")
         
         return []
     
@@ -160,11 +161,11 @@ class PassiveRecon:
                         'type': record_type,
                         'value': str(rdata)
                     })
-                    print(f"  [+] {record_type}: {str(rdata)}")
+                    sys.stderr.write(f"  [+] {record_type}: {str(rdata)}\n")
             except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN, dns.exception.Timeout):
                 pass
             except Exception as e:
-                print(f"[!] DNS query error for {record_type}: {str(e)}")
+                sys.stderr.write(f"[!] DNS query error for {record_type}: {str(e)}\n")
         
         return records
     
@@ -234,10 +235,10 @@ class PassiveRecon:
                     elif 'ASP.NET' in cookie.name:
                         technologies['Backend'] = 'ASP.NET'
             
-            print(f"[+] Detected {len(technologies)} technologies")
+            sys.stderr.write(f"[+] Detected {len(technologies)} technologies\n")
             
         except Exception as e:
-            print(f"[!] Technology fingerprinting error: {str(e)}")
+            sys.stderr.write(f"[!] Technology fingerprinting error: {str(e)}\n")
         
         return technologies
     
@@ -247,7 +248,7 @@ class PassiveRecon:
         
         try:
             # Wayback Machine CDX API
-            print("[*] Querying Wayback Machine...")
+            sys.stderr.write("[*] Querying Wayback Machine...\n")
             wayback_url = f"http://web.archive.org/cdx/search/cdx?url={self.target}/*&output=json&fl=original&collapse=urlkey&limit=100"
             
             response = requests.get(wayback_url, timeout=30)
@@ -259,10 +260,10 @@ class PassiveRecon:
                     if entry and entry[0]:
                         urls.append(entry[0])
             
-            print(f"[+] Found {len(urls)} historical URLs")
+            sys.stderr.write(f"[+] Found {len(urls)} historical URLs\n")
             
         except Exception as e:
-            print(f"[!] Historical URL retrieval error: {str(e)}")
+            sys.stderr.write(f"[!] Historical URL retrieval error: {str(e)}\n")
         
         return urls[:50]  # Limit to 50 URLs
     
@@ -276,7 +277,7 @@ class PassiveRecon:
             asn_info['IP Address'] = ip
             
             # Get IP geolocation info using ip-api.com
-            print(f"[*] Resolving ASN info for {ip}...")
+            sys.stderr.write(f"[*] Resolving ASN info for {ip}...\n")
             response = requests.get(f"http://ip-api.com/json/{ip}", timeout=10)
             
             if response.status_code == 200:
@@ -297,12 +298,12 @@ class PassiveRecon:
                     date = w.creation_date[0] if isinstance(w.creation_date, list) else w.creation_date
                     asn_info['Created'] = str(date)
             except Exception as e:
-                print(f"[!] WHOIS error: {str(e)}")
+                sys.stderr.write(f"[!] WHOIS error: {str(e)}\n")
             
-            print(f"[+] Retrieved ASN information")
+            sys.stderr.write(f"[+] Retrieved ASN information\n")
             
         except Exception as e:
-            print(f"[!] ASN info error: {str(e)}")
+            sys.stderr.write(f"[!] ASN info error: {str(e)}\n")
         
         return asn_info
     
@@ -312,7 +313,7 @@ class PassiveRecon:
         
         try:
             # Check for common S3 bucket patterns
-            print("[*] Checking for S3 bucket leaks...")
+            sys.stderr.write("[*] Checking for S3 bucket leaks...\n")
             bucket_patterns = [
                 self.target.replace('.', '-'),
                 self.target.replace('.', ''),
@@ -328,7 +329,7 @@ class PassiveRecon:
                     response = requests.head(bucket_url, timeout=5)
                     if response.status_code in [200, 403]:  # 403 means bucket exists but private
                         leaks.append(f"S3 Bucket: {bucket_url}")
-                        print(f"  [+] Found S3 bucket: {bucket_url}")
+                        sys.stderr.write(f"  [+] Found S3 bucket: {bucket_url}\n")
                 except:
                     pass
             
@@ -336,7 +337,7 @@ class PassiveRecon:
             leaks.append(f"Manual Check: Search GitHub for '{self.target}'")
             
             # Check for common exposed files
-            print("[*] Checking for exposed files...")
+            sys.stderr.write("[*] Checking for exposed files...\n")
             common_files = [
                 '/.git/config',
                 '/.env',
@@ -351,12 +352,12 @@ class PassiveRecon:
                     response = requests.head(url, timeout=5)
                     if response.status_code == 200:
                         leaks.append(f"Exposed file: {url}")
-                        print(f"  [!] Exposed file found: {url}")
+                        sys.stderr.write(f"  [!] Exposed file found: {url}\n")
                 except:
                     pass
             
         except Exception as e:
-            print(f"[!] Leak detection error: {str(e)}")
+            sys.stderr.write(f"[!] Leak detection error: {str(e)}\n")
         
         return leaks
 
