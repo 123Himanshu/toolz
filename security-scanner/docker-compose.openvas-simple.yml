@@ -1,0 +1,49 @@
+version: '3.8'
+
+# ============================================================================
+# OpenVAS/Nessus Setup - Standalone Container
+# ============================================================================
+# 
+# USAGE:
+#   1. Start OpenVAS:
+#      docker-compose -f docker-compose.openvas-simple.yml up -d
+#
+#   2. Wait 5-10 minutes for initialization (first run)
+#      docker logs -f openvas-gvm
+#
+#   3. Access Web UI:
+#      URL: https://localhost:9390
+#      Username: admin
+#      Password: admin
+#
+#   4. Now scans with OpenVAS/Nessus will work!
+#
+# NOTE: This is separate from the main security-scanner image
+# ============================================================================
+
+services:
+  # OpenVAS/GVM using immauss/openvas image (all-in-one)
+  openvas:
+    image: immauss/openvas:latest
+    container_name: openvas-gvm
+    hostname: openvas
+    ports:
+      - "9392:9392"  # GVM API
+      - "9390:443"   # GSA Web Interface (HTTPS)
+    environment:
+      - USERNAME=admin
+      - PASSWORD=admin
+      - RELAYHOST=172.17.0.1
+      - SMTPPORT=25
+    volumes:
+      - openvas_data:/data
+    networks:
+      - openvas-network
+    restart: unless-stopped
+
+networks:
+  openvas-network:
+    driver: bridge
+
+volumes:
+  openvas_data:

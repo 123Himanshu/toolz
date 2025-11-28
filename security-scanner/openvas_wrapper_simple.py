@@ -19,8 +19,8 @@ class OpenVASScanner:
     
     def __init__(
         self,
-        host: str = "openvas",
-        port: int = 9392,
+        host: str = "localhost",
+        port: int = 9390,
         username: str = "admin",
         password: str = "admin"
     ):
@@ -28,8 +28,8 @@ class OpenVASScanner:
         Initialize OpenVAS scanner
         
         Args:
-            host: OpenVAS hostname (default: openvas container)
-            port: OpenVAS API port (default: 9392)
+            host: OpenVAS hostname (default: localhost for external container)
+            port: OpenVAS Web UI port (default: 9390)
             username: OpenVAS username
             password: OpenVAS password
         """
@@ -37,21 +37,34 @@ class OpenVASScanner:
         self.port = port
         self.username = username
         self.password = password
-        self.base_url = f"http://{host}:{port}"
+        # Try both HTTP and HTTPS
+        self.base_url = f"https://{host}:{port}"
         self.session = requests.Session()
         self.session.auth = (username, password)
+        self.session.verify = False  # Allow self-signed certs
         
     def is_available(self) -> bool:
         """Check if OpenVAS is available"""
+        import urllib3
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+        
         try:
+            # Try HTTPS first (default for OpenVAS)
             response = self.session.get(
                 f"{self.base_url}/",
-                timeout=5
+                timeout=5,
+                verify=False
             )
-            return response.status_code in [200, 401]  # 401 means auth required (good)
-        except Exception as e:
-            sys.stderr.write(f"OpenVAS not available: {e}\n")
-            return False
+            return response.status_code in [200, 401, 302]  # 302 redirect is also OK
+        except Exception:
+            # Try HTTP as fallback
+            try:
+                http_url = f"http://{self.host}:{self.port}/"
+                response = self.session.get(http_url, timeout=5)
+                return response.status_code in [200, 401, 302]
+            except Exception as e:
+                sys.stderr.write(f"OpenVAS not available: {e}\n")
+                return False
     
     def scan(
         self,

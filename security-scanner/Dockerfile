@@ -113,11 +113,12 @@ RUN git clone https://github.com/sullo/nikto /tmp/nikto && \
     nikto -Version
 
 ################################################################################
-# STAGE 14: INSTALL OPENVAS (GVM - Greenbone Vulnerability Manager)
+# STAGE 14: OPENVAS NOTE
 ################################################################################
-# OpenVAS requires PostgreSQL and Redis, install via docker-compose separately
-# For now, create a wrapper that can connect to external OpenVAS instance
-RUN echo "OpenVAS requires separate container - wrapper will connect to external instance"
+# OpenVAS/Nessus requires separate container with PostgreSQL and Redis
+# Use: docker-compose -f docker-compose.openvas-simple.yml up -d
+# The wrapper (openvas_wrapper_simple.py) connects to external OpenVAS instance
+RUN echo "OpenVAS: Use separate container (docker-compose.openvas-simple.yml)"
 
 ################################################################################
 # STAGE 15: VERIFY ALL TOOLS
@@ -136,8 +137,8 @@ RUN echo "==> Verifying installations..." && \
     echo "✓ Nikto: $(nikto -Version 2>&1 | head -n 1)" && \
     echo "✓ Wapiti: $(wapiti --version 2>&1 | head -n 1)" && \
     echo "✓ Python: $(python3 --version)" && \
-    echo "✓ OpenVAS: Wrapper available (requires external instance)" && \
-    echo "==> ALL 13 TOOLS VERIFIED!"
+    echo "✓ OpenVAS: External container (use docker-compose.openvas-simple.yml)" && \
+    echo "==> ALL 11 TOOLS VERIFIED (OpenVAS/Nessus via separate container)!"
 
 ################################################################################
 # STAGE 16: COPY SCANNER FILES
