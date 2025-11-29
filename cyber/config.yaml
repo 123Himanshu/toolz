@@ -1,0 +1,49 @@
+# Attack Path Intelligence Engine Configuration
+
+# Database
+database:
+  neo4j:
+    uri: "bolt://localhost:7687"
+    user: "neo4j"
+    password: "password"
+  
+# API Keys for Threat Intelligence
+api_keys:
+  nvd_api_key: "f047325b-e892-419d-b4dc-4edc37785391"  # Get from https://nvd.nist.gov/developers/request-an-api-key
+  
+# Enrichment Sources
+enrichment:
+  nvd_enabled: true
+  exploitdb_enabled: true
+  epss_enabled: true
+  mitre_attck_enabled: true
+  
+# Risk Scoring Weights
+risk_weights:
+  cvss: 0.25
+  epss: 0.20
+  exploitability: 0.20
+  chain_potential: 0.15
+  zdes: 0.10
+  path_impact: 0.10
+
+# Zero-Day Detection
+zero_day:
+  zdes_threshold: 70  # Flag assets with ZDES > 70
+  anomaly_sensitivity: 0.8
+  
+# Attack Graph
+attack_graph:
+  max_path_length: 5
+  min_cvss_threshold: 4.0
+  
+# Logging
+logging:
+  level: "INFO"
+  file: "logs/engine.log"
+  
+# Output
+output:
+  reports_dir: "reports"
+  json_dir: "output/json"
+  graphs_dir: "output/graphs"
