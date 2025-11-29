@@ -33,7 +33,7 @@ RUN wget -q https://go.dev/dl/go1.21.5.linux-amd64.tar.gz && \
 # STAGE 3: INSTALL PYTHON PACKAGES
 ################################################################################
 RUN pip3 install --no-cache-dir \
-    requests dnspython python-whois urllib3 docker wapiti3
+    requests dnspython python-whois urllib3 docker wapiti3 python-gvm lxml
 
 ################################################################################
 # STAGE 4: INSTALL MASSCAN
@@ -167,6 +167,7 @@ COPY utils.py .
 COPY target_classifier.py .
 COPY test-all-tools.py .
 COPY health-check.py .
+COPY test-gmp-connection.py .
 
 ################################################################################
 # STAGE 17: CREATE DIRECTORIES

@@ -28,8 +28,9 @@ services:
     container_name: openvas-gvm
     hostname: openvas
     ports:
-      - "9392:9392"  # GVM API
-      - "9390:443"   # GSA Web Interface (HTTPS)
+      - "9390:9390"  # GVM GMP API
+      - "9392:9392"  # GSA Web Interface
+      - "443:443"    # GSA HTTPS
     environment:
       - USERNAME=admin
       - PASSWORD=admin
